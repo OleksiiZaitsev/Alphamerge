@@ -1,215 +1,101 @@
-import sys, UI
-import requests
-import re, os
-from PyQt4 import QtCore, QtGui, QtDeclarative
-from PyQt4.QtCore import QTimer
-from PyQt4.QtNetwork import *
+from PySide import QtGui, QtCore
+import os
+import sys
+from PIL import Image, ImageDraw
 import threading
-import time
+
+################################
+path = r"D:\MyPython\alphamerge"
+if path not in sys.path:
+    sys.path.append(path)
+import myUI
+################################
 
 app = QtGui.QApplication(sys.argv)
 window = QtGui.QWidget()
-UI = UI.Ui_PARSER()
+UI = myUI.Ui_alphamerge()
 UI.setupUi(window)
 
 
-path = ''
-url = ''
-except_url = []
-image_size = 500
+class Merge():
+    def __init__(self):
+        self.lineEdit_Image_Source = ''
+        self.lineEdit_Image_Alpha = ''
+        self.isSameImage_Source = ''
+        self.isSameImage_Alpha  = ''
 
-QPixmap_images = ['None','None','None', 'None', 'None']
-
-
-
-
-def Qimages():
-
-    path = os.path.abspath(UI.lineEdit_PATH.text())
+        self.progressBar = 0
+        self.refresh = QtCore.QTimer()
+        self.refresh.timeout.connect(lambda: Merge.variables(self))
+        self.refresh.start(1000)
 
 
-    if os.listdir(path):
-        global QPixmap_images
-        files =[os.path.join(path,i) for i in os.listdir(path)]
-        image = os.path.join(path, max(files, key=os.path.getctime))
-        QPixmap_images.append(image)
 
-        UI.label_image01.setPixmap(QtGui.QPixmap(r'{}'.format(QPixmap_images[-1])))
-        UI.label_image02.setPixmap(QtGui.QPixmap(r'{}'.format(QPixmap_images[-2])))
-        UI.label_image03.setPixmap(QtGui.QPixmap(r'{}'.format(QPixmap_images[-3])))
-        UI.label_image04.setPixmap(QtGui.QPixmap(r'{}'.format(QPixmap_images[-4])))
-        UI.label_image05.setPixmap(QtGui.QPixmap(r'{}'.format(QPixmap_images[-5])))
+    def variables(self):
+        self.lineEdit_Save_Path = UI.lineEdit_Save_Path.text()
+        UI.progressBar.setProperty("value", self.progressBar)
 
 
-Qimages_Timer = QTimer()
-Qimages_Timer.timeout.connect(Qimages)
-Qimages_Timer.start(1000)
 
-# DATA PREPARATION IN LIST BY URL
-def data(url):
-    data = []
-    deep_data = []
-
-    if not re.findall(r'(htt.{1,3}://.+?)', url):
-        url = "http://" + url
-
-    ROOT_URL = re.findall(r'(^http[s]*://.+\.(ua|com|ru|me|net|io|to)).*', url)[0]
-    page = requests.get(url='{}'.format(url))
-    print("url       :",url)
-    print("ROOT_URL       :", ROOT_URL)
-    #################################################################################
-    def images(pattern: str, text: str):
-        pattern = pattern
-        URLs = re.findall(pattern, text)
-        for i in URLs:
-            if not re.findall("(^htt.*)", i) and re.findall("(jpg|png|gif|ico)", i):
-                print("1  =", i)
-                data.append(str(ROOT_URL[0]) + "/" + i)
-
-            elif re.findall("(attachment)", i):
-                print("2  =", i)
-                data.append(str(ROOT_URL[0]) + "/" + i)
-
-            elif re.findall("(^htt.*jpg|png|gif|ico.*)", i):
-                print("3  =", i)
-                data.append(i)
-
-            else:
-                deep_data.append(i)
-                print("deep_data:    ",i)
-
-    #################################################################################
+        self.lineEdit_Image_Source = UI.lineEdit_Image_Source.text()
+        self.lineEdit_Image_Alpha = UI.lineEdit_Image_Alpha.text()
 
 
-    RSS_URLs = re.findall(r'.*"(htt.*rss)".*', page.text)
-    if RSS_URLs:
-        print(RSS_URLs)
-        RSS = requests.get(url='{}'.format(RSS_URLs[0]))
-        images(r'.*img src\="(.*?)\"', RSS.text)
-        images(r'"(htt.{1,3}://.+?)"',RSS.text)
+        if self.lineEdit_Image_Alpha != self.isSameImage_Alpha or self.lineEdit_Image_Source!=self.isSameImage_Source:
+            UI.label_Image_Source_image.setPixmap(QtGui.QPixmap(r'{}'.format(self.lineEdit_Image_Source)))
+            UI.label_Image_Alpha_image.setPixmap(QtGui.QPixmap(r'{}'.format(self.lineEdit_Image_Alpha)))
 
-    images(r'.*img src\="(.*?)\"', page.text)
-    images(r'"(htt.{1,3}://.+?)"', page.text)
-    images(r'src="(/attachment[\w?\.\=]*[0-9]*)"', page.text)
-
-    if UI.checkBox.checkState():
-        for i in set(deep_data):
-            try:
-                deep_URLs = requests.get(url='{}'.format(i))
-                images(r'.*img src\="(.*?)\"', deep_URLs.text)
-                images(r'"(htt.{1,3}://.+?)"', deep_URLs.text)
-                images(r'src="(/attachment[\w?\.\=]*[0-9]*)"', deep_URLs.text)
-            except:
-                print("404    -",    i)
-
-    return set(data)
+        self.isSameImage_Source = self.lineEdit_Image_Source
+        self.isSameImage_Alpha = self.lineEdit_Image_Alpha
 
 
-# SAVE IMAGE BY URL
-def save(url: str):
-    path = dir_path_exists() + '\\'
-    try:
-        name = naming(url)
-        image = requests.get(url)
-        if image.content.__sizeof__() > int(float(UI.lineEdit_SIZE_value.text())*1e+3):
-            with open('{}{}'.format(path, name), "wb") as imgfile:
-                imgfile.write(image.content)
-    except:
-        print("can`t save:  ", url)
+    def pushButton_Merge_Alpha(self):
 
-# NAME IMAGE BY URL
-def naming(url: str):
-    url_separator = re.split('\/|\?', url)
-    type_of_image = re.findall(".*(jpg|png|gif|ico).*", url)
-    name_of_image = re.findall('([=a-zA-Z0-9_-]*).*', url_separator[-1])
-    if type_of_image:
-        return str(name_of_image[0]) + '.' + str(type_of_image[0])
-    else:
-        return str(name_of_image[0]) + '.' + str("png")
+        image = Image.open(self.lineEdit_Image_Source).convert('RGBA')
+        alpha = Image.open(self.lineEdit_Image_Alpha).convert('RGBA')
 
-# DIR PATH EXISTS
-def dir_path_exists():
-    if not os.path.exists(os.path.abspath(UI.lineEdit_PATH.text())):
-        if UI.lineEdit_PATH.text() == None:
-            UI.lineEdit_PATH.setText('temp')
-        os.mkdir(os.path.abspath(UI.lineEdit_PATH.text()))
+        alpha_data = alpha.load()
+        image_data = image.load()
 
-    else:
-        pass
-    return str(os.path.abspath(UI.lineEdit_PATH.text()))
-# OPEN DIR
-def open_dir():
-    dir_path_exists()
-    os.startfile(os.path.abspath(UI.lineEdit_PATH.text()))
+        for y in range(alpha.size[1]):
+            for x in range(alpha.size[0]):
+                if self.__running:
+                    self.progressBar = (y / alpha.size[1])*100
+                    if sum(alpha_data[x, y][0:3])/3 == alpha_data[x, y][0]:
+                        image_data[x, y] = (image_data[x, y][0], image_data[x, y][1], image_data[x, y][2], alpha_data[x, y][1])
 
+        if self.__running:
+            image.save(self.lineEdit_Save_Path, format="PNG")
+            UI.progressBar.setProperty("value", 100)
 
-class programThreadsFor():
-    def __init__(self, save, data):
-        self._running = None
-        self.save = save
-        self.data = data
-        self.progressBar_value = 0
-        self.timer = QTimer()
-
-    def progressBar(self):
-        UI.progressBar.setProperty("value", self.progressBar_value)
-
-    def BODY(self):
-        self.url = UI.lineEdit_URL.text()
-        self.summ = len(self.data(self.url))
-
-        for i in enumerate(self.data(self.url)):
-            if self._running == False: break
-            self.save(i[1])
-            self.progressBar_value = (i[0]/self.summ)*100
-        self.progressBar_value = 100
-
-    def START(self):
-        self.progressBar_value = 0
-        self.timer.timeout.connect(self.progressBar)
-        self.timer.start(1000)
-
-        self.url = UI.lineEdit_URL.text()
-        if not re.findall(r'(htt.{1,3}://.+?)', self.url):
-            self.url = "http://" + self.url
-
-        UI.webView.setUrl(QtCore.QUrl(self.url))
-        self._running = True
-        self.Thread = threading.Thread(target=lambda: self.BODY())
+    def Threading(self):
+        self.__running = True
+        self.Thread = threading.Thread(target=lambda: self.pushButton_Merge_Alpha())
         self.Thread.start()
+    def Cancel(self):
+        self.__running = False
 
-    def STOP(self):
-        self.timer.stop()
-        self.Thread.daemon
-        self._running = False
-        self.Thread.join()
-        print('=== END ===')
+    def image_source(self):
+        fileName = QtGui.QFileDialog.getOpenFileName(filter="Images (*.png *.bmp *.jpg)")[0]
+        UI.lineEdit_Image_Source.setText(fileName)
 
-class programThreads():
-    def __init__(self, func):
-        self.func = func
+    def image_alpha(self):
+        fileName = QtGui.QFileDialog.getOpenFileName(filter="Images (*.png *.bmp *.jpg)")[0]
+        UI.lineEdit_Image_Alpha.setText(fileName)
 
-    def START(self):
-        self.Thread = threading.Thread(target=lambda: self.func())
-        self.Thread.start()
-
-
-tread_parse = programThreadsFor(save, data)
-tread_open_dir = programThreads(lambda: open_dir())
-
-def horizontalSlider_func():
-    UI.lineEdit_SIZE_value.setText("{}".format(UI.horizontalSlider.value()))
+    def save_path(self):
+        fileName = QtGui.QFileDialog.getSaveFileName(filter="Images (*.png *.bmp *.jpg)")[0]
+        UI.lineEdit_Save_Path.setText(fileName)
 
 
+Root = Merge()
 
-UI.horizontalSlider.valueChanged.connect(horizontalSlider_func)
+UI.pushButton_Merge_Alpha.clicked.connect(lambda: Root.Threading())
 
-QtCore.QObject.connect(UI.pushButton_START,QtCore.SIGNAL("clicked()"), lambda: tread_parse.START())
-QtCore.QObject.connect(UI.pushButton_STOP, QtCore.SIGNAL("clicked()"), lambda: tread_parse.STOP())
-QtCore.QObject.connect(UI.pushButton_OPEN, QtCore.SIGNAL("clicked()"), lambda: tread_open_dir.START())
-
-
-
-if __name__ == '__main__':
+UI.toolButton_Image_Source_get_path.clicked.connect(lambda: Root.image_source())
+UI.toolButton_Image_Alpha_get_path.clicked.connect(lambda: Root.image_alpha())
+UI.toolButton_Save_Path_get_path.clicked.connect(lambda: Root.save_path())
+UI.pushButton_Cancel.clicked.connect(lambda: Root.Cancel())
+if __name__ == "__main__":
     window.show()
     sys.exit(app.exec_())
