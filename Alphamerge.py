@@ -1,15 +1,9 @@
-from PySide import QtGui, QtCore
+from PyQt4 import QtGui, QtCore
 import os
 import sys
 from PIL import Image, ImageDraw
 import threading
-
-################################
-path = r"D:\MyPython\alphamerge"
-if path not in sys.path:
-    sys.path.append(path)
 import myUI
-################################
 
 app = QtGui.QApplication(sys.argv)
 window = QtGui.QWidget()
